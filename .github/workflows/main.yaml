@@ -1,8 +1,8 @@
-name: Terraform Security Scan
+name: Terraform Security Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
 
 jobs:
@@ -10,34 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      # ---------------------------------
+      # 1️⃣ Checkout Code
+      # ---------------------------------
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        continue-on-error: true   # Even if this fails, continue
 
-      # -----------------------------
-      # Install Terraform (optional)
-      # -----------------------------
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      # -----------------------------
-      # Run Checkov
-      # -----------------------------
+      # ---------------------------------
+      # 2️⃣ Run Checkov
+      # ---------------------------------
       - name: Run Checkov Scan
+        id: checkov
         uses: bridgecrewio/checkov-action@master
+        continue-on-error: true
         with:
           directory: .
           framework: terraform
-          soft_fail: false
           output_format: cli
-          quiet: false
 
-      # -----------------------------
-      # Run Trivy (Aqua Security)
-      # -----------------------------
-      - name: Run Trivy IaC Scan
+      # ---------------------------------
+      # 3️⃣ Run Trivy (Aqua Security)
+      # ---------------------------------
+      - name: Run Trivy Scan
+        id: trivy
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           scan-type: config
           scan-ref: .
           severity: HIGH,CRITICAL
           exit-code: 1
+
+      # ---------------------------------
+      # 4️⃣ Final Security Gate
+      # ---------------------------------
+      - name: Fail Pipeline If Any Scan Failed
+        if: steps.checkov.outcome == 'failure' || steps.trivy.outcome == 'failure'
+        run: |
+          echo "Security violations detected."
+          exit 1
